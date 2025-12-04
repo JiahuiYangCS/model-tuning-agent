@@ -1,0 +1,7 @@
+site_name: STSb Auto-Tune Agent Docs
+nav:
+  - Home: index.md
+  - Functions: FUNCTIONS_DOC.md
+  - Flowchart: flowchart_bilingual.md
+theme:
+  name: material

@@ -1,0 +1,131 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="1600" height="1200" viewBox="0 0 1600 1200" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <style>
+      .title { font: 700 20px/1.1 'Segoe UI', Roboto, Arial, sans-serif; fill: #0b3954 }
+      .node { font: 600 16px/1.1 'Segoe UI', Roboto, Arial, sans-serif; fill: #012a4a }
+      .node-small { font: 14px 'Segoe UI', Roboto, Arial, sans-serif; fill: #012a4a }
+      .box { fill: #e6f2ff; stroke: #1f6f8b; stroke-width: 2; rx: 8; }
+      .decision { fill: #fff6e6; stroke: #d97409; stroke-width: 2; rx: 8; }
+      .arrow { stroke: #3a6ea5; stroke-width: 2; fill: none; marker-end: url(#arrowhead); }
+    </style>
+    <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#3a6ea5" />
+    </marker>
+  </defs>
+
+  <!-- Title -->
+  <text x="40" y="40" class="title">STSb Auto-Tune Agent v6 — 流程图 (中/英) / Process Flow (CN/EN)</text>
+
+  <!-- Nodes -->
+  <!-- Start -->
+  <rect x="60" y="80" width="220" height="60" class="box"/>
+  <text x="170" y="110" text-anchor="middle" class="node">开始 / Start</text>
+
+  <!-- InitConfig -->
+  <rect x="60" y="180" width="320" height="80" class="box"/>
+  <text x="220" y="205" text-anchor="middle" class="node">加载默认配置 / Load default config</text>
+  <text x="220" y="225" text-anchor="middle" class="node-small">(make_default_config, export_config_for_agent)</text>
+
+  <!-- AskInit -->
+  <rect x="60" y="300" width="420" height="100" class="box"/>
+  <text x="270" y="340" text-anchor="middle" class="node">调用 GPT：初始计划 / ask_gpt_for_initial_plan</text>
+  <text x="270" y="360" text-anchor="middle" class="node-small">(返回 base_config + priority_keys)</text>
+
+  <!-- ApplyBase -->
+  <rect x="60" y="440" width="360" height="80" class="box"/>
+  <text x="240" y="470" text-anchor="middle" class="node">应用 base_config / Apply base_config</text>
+  <text x="240" y="490" text-anchor="middle" class="node-small">(仅覆盖已知键 only known keys)</text>
+
+  <!-- ForEachParam decision -->
+  <rect x="520" y="260" width="360" height="80" class="decision"/>
+  <text x="700" y="295" text-anchor="middle" class="node">遍历 priority_keys / For each priority_key</text>
+  <text x="700" y="315" text-anchor="middle" class="node-small">(最多 3 个, ≤3 params)</text>
+
+  <!-- SingleParam cluster -->
+  <!-- ParamStart -->
+  <rect x="520" y="380" width="360" height="60" class="box"/>
+  <text x="700" y="415" text-anchor="middle" class="node">初始化参数内部状态 / Init param_best</text>
+
+  <!-- InnerRoundStart -->
+  <rect x="520" y="460" width="420" height="80" class="box"/>
+  <text x="730" y="490" text-anchor="middle" class="node">内循环：训练 train_one_round</text>
+  <text x="730" y="510" text-anchor="middle" class="node-small">(加载数据、训练、保存、评估)</text>
+
+  <!-- Evaluate -->
+  <rect x="520" y="560" width="360" height="60" class="box"/>
+  <text x="700" y="595" text-anchor="middle" class="node">评估 / Evaluate (main_score)</text>
+
+  <!-- Record -->
+  <rect x="520" y="640" width="420" height="70" class="box"/>
+  <text x="730" y="675" text-anchor="middle" class="node">记录历史 & 更新最优 / Record & update bests</text>
+
+  <!-- AskGPTNew -->
+  <rect x="520" y="730" width="520" height="80" class="box"/>
+  <text x="780" y="760" text-anchor="middle" class="node">调用 GPT：本轮建议 / ask_gpt_for_new_config</text>
+  <text x="780" y="780" text-anchor="middle" class="node-small">(primary_key 模式：只建议该键)</text>
+
+  <!-- ApplySuggestion -->
+  <rect x="520" y="840" width="420" height="70" class="box"/>
+  <text x="730" y="875" text-anchor="middle" class="node">应用建议（仅该键） / Apply suggestion</text>
+
+  <!-- AskUser -->
+  <rect x="520" y="940" width="420" height="70" class="box"/>
+  <text x="730" y="975" text-anchor="middle" class="node">询问用户是否继续 / Ask user to continue?</text>
+  <text x="730" y="995" text-anchor="middle" class="node-small">(交互 input, 可修改为 non-interactive)</text>
+
+  <!-- ParamEnd -->
+  <rect x="520" y="1040" width="420" height="70" class="box"/>
+  <text x="730" y="1075" text-anchor="middle" class="node">该参数结束：固定最佳值 / Fix best param value</text>
+
+  <!-- AfterAll -->
+  <rect x="60" y="560" width="320" height="80" class="box"/>
+  <text x="220" y="600" text-anchor="middle" class="node">（备用）其他流程 / Other steps</text>
+
+  <!-- CopyBest -->
+  <rect x="60" y="700" width="420" height="80" class="box"/>
+  <text x="270" y="740" text-anchor="middle" class="node">复制最佳模型（可选） / Copy best model</text>
+
+  <!-- AskOverall -->
+  <rect x="60" y="840" width="520" height="80" class="box"/>
+  <text x="310" y="880" text-anchor="middle" class="node">调用 GPT：整体总结 / ask_gpt_for_overall_summary</text>
+
+  <!-- End -->
+  <rect x="60" y="980" width="220" height="60" class="box"/>
+  <text x="170" y="1010" text-anchor="middle" class="node">结束 / End</text>
+
+  <!-- Arrows (simple straight lines) -->
+  <path d="M170 140 L170 180" class="arrow" />
+  <path d="M170 260 L170 300" class="arrow" />
+  <path d="M170 400 L170 440" class="arrow" />
+
+  <path d="M380 480 L520 300" class="arrow" />
+  <path d="M520 340 L520 380" class="arrow" />
+  <path d="M700 440 L700 460" class="arrow" />
+  <path d="M700 540 L700 560" class="arrow" />
+  <path d="M700 620 L700 640" class="arrow" />
+  <path d="M740 710 L740 730" class="arrow" />
+  <path d="M740 810 L740 840" class="arrow" />
+  <path d="M740 910 L740 940" class="arrow" />
+  <path d="M740 1010 L740 1040" class="arrow" />
+
+  <!-- From ParamEnd back to ForEachParam (loop) -->
+  <path d="M520 1110 L260 1110 L260 340 L520 340" class="arrow" />
+
+  <!-- After finishing params go to CopyBest & AskOverall -->
+  <path d="M520 1110 L720 1110 L720 840 L520 840" stroke="#3a6ea5" stroke-width="0" fill="none"/>
+  <path d="M520 1110 L720 1110" class="arrow" />
+
+  <!-- From ApplyBase to ForEachParam -->
+  <path d="M240 520 L520 300" class="arrow" />
+
+  <!-- From CopyBest to AskOverall -->
+  <path d="M270 780 L270 840" class="arrow" />
+  <path d="M270 920 L170 920" class="arrow" />
+
+  <!-- From AskOverall to End -->
+  <path d="M310 920 L310 980" class="arrow" />
+
+  <!-- Footer note -->
+  <text x="40" y="1180" class="node-small">文件：docs/assets/flowchart_bilingual_manual.svg — 可在浏览器中打开以放大查看 / Open in browser to zoom</text>
+</svg>

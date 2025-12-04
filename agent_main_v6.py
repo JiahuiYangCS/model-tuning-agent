@@ -19,6 +19,66 @@ def apply_new_config(base_config: Dict[str, Any], new_config: Dict[str, Any]) ->
     return cfg
 
 
+def generate_run_report(
+    history: List[Dict[str, Any]],
+    best_round: Optional[int],
+    best_score: float,
+    best_config: Optional[Dict[str, Any]],
+    priority_keys: List[str],
+    base_cfg: Dict[str, Any],
+) -> str:
+    """
+    生成一份简单的中英双语报告，总结 agent 在本次运行中每一步做了什么，并把报告写到 `docs/reports/`。
+    返回报告文件的绝对路径。
+    """
+    from datetime import datetime
+
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    report_dir = os.path.join(os.getcwd(), "docs", "reports")
+    os.makedirs(report_dir, exist_ok=True)
+    filename = f"agent_run_report_{ts}.md"
+    report_path = os.path.join(report_dir, filename)
+
+    lines: List[str] = []
+    lines.append(f"# Agent 运行报告 / Agent Run Report ({ts})\n")
+    lines.append("## 概要 / Summary\n")
+    lines.append(f"- 优先调参列表 Priority keys: {priority_keys}\n")
+    lines.append(f"- 应用的 base_config (只列出被修改或建议的键) / base_config applied: {json.dumps(base_cfg, ensure_ascii=False)}\n")
+    lines.append(f"- 历史最佳轮次 Best round: {best_round}, Best score: {best_score:.4f}\n")
+
+    lines.append("## 逐轮记录 / Per-round log (simple CN/EN explanations)\n")
+    if not history:
+        lines.append("无历史记录 / No history recorded.\n")
+    else:
+        for h in history:
+            rid = h.get("round_id")
+            key = h.get("tuned_key")
+            inner = h.get("inner_round_index")
+            cfg = h.get("config_for_agent")
+            score = h.get("main_score")
+
+            lines.append(f"### 轮次 Round {rid} — 调参键 tuned_key: {key} (inner {inner})\n")
+            lines.append(f"- 本轮使用的配置 / Config used: {json.dumps(cfg, ensure_ascii=False)}\n")
+            lines.append(f"- 本轮主评估分数 / Main score: {score}\n")
+            # 简单易懂的中英说明
+            lines.append(f"- 简要说明（中文）：本轮对 `{key}` 进行了单变量调参，记录了当前取值与评估分数，用于比较是否优于之前的取值。\n")
+            lines.append(f"- Brief (EN): This round tuned the single key `{key}` and recorded its value and evaluation score to compare with previous values.\n")
+            lines.append("\n")
+
+    lines.append("## 结论与下一步建议 / Conclusions & Next Steps\n")
+    lines.append("- 结论（中文）：请查看 above 的每轮评分，选择评分最高的配置作为最终使用或进一步验证。\n")
+    lines.append("- Conclusion (EN): Inspect per-round scores above and pick the best-scoring configuration for final use or further validation.\n")
+    lines.append("- 建议 / Suggestion: 可将 best_config 用于后续更长训练，或扩大数据/修改底模以进一步提升。\n")
+
+    # 写文件
+    with open(report_path, "w", encoding="utf-8") as f:
+        f.write("\n".join(lines))
+
+    # 打印报告路径并返回
+    print(f"\n📄 运行报告已生成：{report_path}")
+    return report_path
+
+
 # =============== 主循环 Agent Demo v6 ===============
 # 特点：
 # 1）保留 v5 中所有 TUNABLE_KEYS，不做删减；
@@ -48,6 +108,10 @@ def run_agent_v6() -> None:
     history_for_agent: List[Dict[str, Any]] = []
 
     # ========= 第 0 步：让 GPT 选出 base_config + priority_keys =========
+    # prepare defaults so they exist even if GPT call fails
+    base_cfg: Dict[str, Any] = {}
+    valid_priority_keys: List[str] = []
+
     try:
         print("\n===== 第 0 步：调用 GPT 生成 base_config + priority_keys（最多 3 个） =====")
         init_plan = ask_gpt_for_initial_plan(
@@ -216,6 +280,21 @@ def run_agent_v6() -> None:
             print("✅ 最佳模型权重已复制完成。")
         except Exception as e:
             print("\n⚠️ 复制最佳模型权重时出错（不影响训练结果），错误信息：", repr(e))
+    # 生成一份简单中英双语运行报告（写入 docs/reports/）
+    try:
+        try:
+            report_path = generate_run_report(
+                history_for_agent,
+                best_round,
+                float(best_score),
+                best_config,
+                valid_priority_keys,
+                base_cfg,
+            )
+        except Exception as e:
+            print("\n⚠️ 生成运行报告时出错（不影响训练结果），错误信息：", repr(e))
+    except Exception:
+        pass
 
     # 最后：生成一次整体总结
     try:
