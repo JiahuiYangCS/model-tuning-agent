@@ -19,7 +19,7 @@ def generate_run_report(
     base_cfg: Dict[str, Any],
 ) -> str:
     """
-    生成一份简单的中英双语报告，总结 agent 在本次运行中每一步做了什么，并把报告写到 `docs/reports/`
+    生成报告：先显示最终结果摘要，后显示每轮详细记录
     
     参数 / Args:
         history: 训练历史记录列表
@@ -40,12 +40,29 @@ def generate_run_report(
 
     lines: List[str] = []
     lines.append(f"# Agent 运行报告 / Agent Run Report ({ts})\n")
-    lines.append("## 概要 / Summary\n")
-    lines.append(f"- 优先调参列表 / Priority keys: {priority_keys}\n")
-    lines.append(f"- 应用的 base_config / Base config applied: {json.dumps(base_cfg, ensure_ascii=False)}\n")
-    lines.append(f"- 历史最佳轮次 / Best round: {best_round}, 最佳分数 / Best score: {best_score:.4f}\n")
-
-    lines.append("## 逐轮记录 / Per-round log (CN/EN explanations)\n")
+    
+    # ===== 最终结果摘要（放在最上方）=====
+    lines.append("## 最终结果摘要 / Final Results Summary\n")
+    lines.append(f"**最优轮次 / Best Round:** {best_round}\n")
+    lines.append(f"**最优分数 / Best Score:** {best_score:.4f}\n")
+    lines.append(f"**调整的参数 / Tuned Parameters:** {', '.join(priority_keys)}\n")
+    lines.append(f"\n**最终配置 / Final Configuration:**\n")
+    if best_config:
+        for k, v in sorted(best_config.items()):
+            lines.append(f"  - {k}: {v}\n")
+    lines.append(f"\n**初始建议 / Base Config Applied:**\n")
+    if base_cfg:
+        for k, v in sorted(base_cfg.items()):
+            lines.append(f"  - {k}: {v}\n")
+    
+    # 生成效果改进说明
+    lines.append(f"\n**效果说明 / Performance Note:**\n")
+    lines.append(f"本次调参通过 GPT 代理对选定参数进行单变量优化。")
+    lines.append(f"从初始配置开始，逐轮测试不同的参数值，保留最优值。")
+    lines.append(f"最终获得的最优分数为 {best_score:.4f}（轮次 #{best_round}）。\n")
+    
+    # ===== 详细逐轮记录（后面）=====
+    lines.append("## 详细逐轮记录 / Detailed Per-Round Log\n")
     if not history:
         lines.append("无历史记录 / No history recorded.\n")
     else:
@@ -56,22 +73,22 @@ def generate_run_report(
             cfg = h.get("config_for_agent")
             score = h.get("main_score")
 
-            lines.append(f"### 轮次 / Round {rid} — 调参键 / Tuned key: {key} (inner {inner})\n")
-            lines.append(f"- 本轮使用的配置 / Config used: {json.dumps(cfg, ensure_ascii=False)}\n")
-            lines.append(f"- 本轮主评估分数 / Main score: {score}\n")
-            lines.append(f"- 简要说明（中文）/ Brief (CN): 本轮对 `{key}` 进行了单变量调参，记录了当前取值与评估分数，用于比较是否优于之前的取值。\n")
-            lines.append(f"- Brief (EN): This round tuned the single key `{key}` and recorded its value and evaluation score to compare with previous values.\n")
+            lines.append(f"### 轮次 / Round {rid} — 参数 / Key: {key} (inner {inner})\n")
+            lines.append(f"**配置 / Config:** {json.dumps(cfg, ensure_ascii=False)}\n")
+            lines.append(f"**分数 / Score:** {score:.4f}\n")
+            lines.append(f"**说明 / Note:** 本轮对 `{key}` 进行单变量调优，记录参数值与评估分数以确定最优值。\n")
             lines.append("\n")
 
-    lines.append("## 结论与下一步建议 / Conclusions & Next Steps\n")
-    lines.append("- 结论（中文）/ Conclusion (CN): 请查看 above 的每轮评分，选择评分最高的配置作为最终使用或进一步验证。\n")
-    lines.append("- Conclusion (EN): Inspect per-round scores above and pick the best-scoring configuration for final use or further validation.\n")
-    lines.append("- 建议 / Suggestion: 可将 best_config 用于后续更长训练，或扩大数据/修改底模以进一步提升。\n")
+    lines.append("## 建议 / Recommendations\n")
+    lines.append(f"1. 可将上述最优配置用于更长训练（增加 NUM_TRAIN_EPOCHS）\n")
+    lines.append(f"2. 可扩大数据集（修改 STSB_TRAIN_SPLIT）进行验证\n")
+    lines.append(f"3. 可继续调整其他未触及的参数以进一步优化\n")
 
     # 写文件
     with open(report_path, "w", encoding="utf-8") as f:
         f.write("\n".join(lines))
 
     # 打印报告路径并返回
-    print(f"\n📄 运行报告已生成 / Report generated: {report_path}")
+    print(f"\n报告已生成 / Report generated: {report_path}")
     return report_path
+
