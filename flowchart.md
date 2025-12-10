@@ -29,6 +29,7 @@ flowchart LR
 ```
 
 说明：
+
 - 节点 `ask_gpt_for_initial_plan` 用于生成初始 `base_config` 与 `priority_keys`；
 - 对每个 `priority_key` 执行 1..3 次单变量训练循环（由 `ROUNDS_PER_PARAM` 控制），每轮训练后通过 `ask_gpt_for_new_config` 请求 GPT 在该 key 上给出新值建议；
 - 整体结束后会调用 `ask_gpt_for_overall_summary` 输出最终总结，并可将全局最佳模型复制到 `best_overall_model`。

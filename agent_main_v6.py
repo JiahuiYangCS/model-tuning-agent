@@ -312,8 +312,7 @@ def run_agent_v6() -> None:
 
 
 # 直接在 Notebook 中运行这一行即可启动 v6 Agent 流程
-run_agent_v6()
-
+# 注意：已移除顶层自动执行调用，确保安全导入模块用于测试或其他用途。
 if __name__ == "__main__":
     # 直接从命令行运行： python agent_main_v6.py
     run_agent_v6()
