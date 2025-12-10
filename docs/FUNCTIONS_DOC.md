@@ -1,23 +1,5 @@
-```markdown
-# 函数与模块说明（逐函数解释）
+（该文件已被归档备份到 `docs/FUNCTIONS_DOC.md.bak`，并从主文档中移除以简化仓库。）
 
-下列文档为仓库中每个主要函数的作用说明、参数、返回值、使用注意与实现要点。文档以中文为主，便于快速阅读和维护。
-
-----------
-
-**文件**：`openai_client.py`
-- 说明：该文件仅负责初始化 OpenAI 客户端实例 `client`，并从环境变量中读取 API Key（由 OpenAI 官方 Python 客户端库 `openai` 提供的 `OpenAI` 类）。
-- 主要符号：
-  - `client`：已初始化的 `OpenAI` 客户端，全局复用供其它模块（如 `gpt_agent_v6.py`）调用。
-
-注意：运行前请设置环境变量 `OPENAI_API_KEY`（PowerShell 示例：`$env:OPENAI_API_KEY = "sk-xxx"`）。如果该变量缺失或无效，后续调用 LLM 接口会抛出异常。
-
-----------
-
-**文件**：`gpt_agent_v6.py`
-
-- `build_agent_input(config_for_agent: Dict[str, Any], training_summary: Dict[str, Any], history: Optional[List[Dict[str, Any]]] = None, primary_key: Optional[str] = None) -> str`
-  - 作用：把当前轮的配置（供 LLM 参考）、训练总结、可选历史与当前正在调的主键打包为 JSON 字符串，作为用户输入发送给 LLM。该函数用于统一构造 prompt 中的用户输入部分。
   - 参数：
     - `config_for_agent`：当前要给 LLM 的配置视图（通常由 `export_config_for_agent` 提供）。
     - `training_summary`：本轮训练后的 summary（包含 `main_score`、`output_dir` 等字段）。

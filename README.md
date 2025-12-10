@@ -1,50 +1,78 @@
-# STSb Auto-Tune Agent v6（简易说明）
+模型微调代理（Model Tuning Agent）
 
-简体中文说明，帮助快速上手 `agent_main_v6.py` 演示程序。
+概述
 
-**概述**
-- 这是一个演示性自动微调 Agent，针对 SentenceTransformer 的 STS-B（STSb）任务，采用“控制变量 + 顺序单变量调参”流程：先由 LLM（GPT）给出初始 base_config 与若干 priority_keys，然后依次对每个优先参数做若干轮单变量调参、每轮训练后让 GPT 给出建议并更新配置，最后生成整体总结并（可选）复制最佳模型。
+本仓库实现了一个模块化的 Python 项目，用于通过 GPT 驱动的代理自动化调整模型超参数。项目结构清晰、职责分离，并提供单一入口用于运行微调与自动调参流程。
 
-**重要文件**
-- `agent_main_v6.py`: 程序入口，控制自动调参主循环与交互（交互式询问是否继续）。
-- `config_and_train.py`: 默认配置、训练流程、评估与可选的 Quora 校验功能。
-- `gpt_agent_v6.py`: 与 LLM（通过 `openai_client.py` 初始化的 `client`）交互，包含三个调用：初始计划、每轮建议、新建总体总结。
-- `openai_client.py`: 封装 OpenAI 客户端的初始化（读取环境变量 `OPENAI_API_KEY`）。
+主要特性
 
-**先决条件（Prerequisites）**
-- Python 3.8+（建议使用虚拟环境）。
-- 必要 Python 包（示例安装命令，Windows PowerShell）：
+- 模块化结构：`core/`、`agents/`、`utils/`。
+- 集中配置：所有可调参数在 `config.py` 中管理。
+- GPT 驱动的调参流程由 `run.py` 协同执行。
+- 自动生成运行报告，保存在 `docs/reports/`。
+- 提供 `setup_api_key.py` 用于快速配置 OpenAI API Key。
 
-```
-python -m pip install openai sentence-transformers datasets transformers matplotlib pandas
-# 请根据你的平台单独安装合适版本的 torch（https://pytorch.org/get-started/locally/）。
-```
+前置条件
 
-- 在运行前请设置环境变量 `OPENAI_API_KEY`：
+- Python 3.11
+- PyTorch
+- sentence-transformers
+- transformers
+- datasets
+- openai（或兼容的 GPT HTTP 客户端）
 
-```
-$env:OPENAI_API_KEY = "sk-xxx"
-```
+安装
 
-**快速开始（PowerShell）**
+建议使用虚拟环境并安装依赖：
 
-1. 在项目目录下（含 `agent_main_v6.py` 文件处）运行：
-
-```
-python .\agent_main_v6.py
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
 ```
 
-2. 程序会打印初始 config，并调用 GPT 生成 `base_config` 与 `priority_keys`。随后进入每个参数的多轮单变量调参，每轮训练完成后会询问是否继续下一轮（交互式输入 `y/n`）。
+如果仓库中没有 `requirements.txt`，请根据 `PROGRAM_DESCRIPTION.md` 或代码中导入的包手动安装所需依赖。
 
-3. 训练产生的模型输出保存在 `models/` 子目录下（`OUTPUT_DIR_ROOT`），程序结束时若检测到最佳轮次，会尝试复制该轮模型为 `best_overall_model`。
+快速开始
 
-**运行注意事项**
-- 该示例为了便于本地测试默认使用较小数据切片（见 `config_and_train.make_default_config()`），生产/大规模运行请修改相应配置（训练集、batch、epoch、device 等）。
-- 如果未正确设置 `OPENAI_API_KEY`，LLM 调用会失败，程序会捕获异常并使用兜底策略继续运行，但会跳过基于 GPT 的建议步骤。
-- 若使用 CUDA，请确保 `torch` 已安装对应的 CUDA 版本。
+1. 配置 API Key（任选其一）：
 
-**常见改进方向**
-- 将 `TUNABLE_KEYS` 扩展到更多超参或增加更细粒度的搜索策略。
-- 自动化记录与可视化（如将 GPT 的建议和每轮结果写入 CSV/MLflow）。
+```powershell
+python setup_api_key.py
+# 或在环境变量中设置 OPENAI_API_KEY，或在 .env 文件中放置 API Key
+```
 
-如需我把 `requirements.txt`、启动脚本或 CI 工作流也一并加上，告诉我你的偏好，我可以继续添加。
+2. 编辑 `config.py`，根据机器资源和数据规模调整参数。
+
+3. 运行代理：
+
+```powershell
+python run.py
+```
+
+项目结构
+
+- `run.py` — 主入口，协调调参流程。
+- `config.py` — 集中配置与可调参数列表。
+- `core/` — 与训练相关的实现（数据加载、训练、评估）。
+- `agents/` — 与 GPT 通信的封装与提示构建逻辑。
+- `utils/` — 工具函数（OpenAI 客户端、报告生成等）。
+- `docs/` — 文档与生成的运行报告。
+
+推荐工作流程
+
+- 将参数修改集中在 `config.py`，避免分散在多个脚本中。
+- 调试与快速迭代时使用小数据集或减少训练轮数以加速验证。
+- 每次运行后检查 `docs/reports/` 中生成的报告以评估效果。
+
+维护与清理
+
+仓库中保留了一些早期版本的旧文件以便向后兼容或用于参考。若希望将项目精简为标准化工程，可根据 `FILE_CLASSIFICATION.md` 中的清单删除不再需要的旧文件。建议在删除前使用版本控制或备份以便恢复。
+
+支持与贡献
+
+如需修改或扩展，建议通过提交 issue 或 PR 进行。请在 PR 中包含可复现的测试或小样例以便审查。
+
+版权与许可证
+
+仓库当前未包含许可证文件。若计划公开分发，请添加合适的 `LICENSE` 文件。

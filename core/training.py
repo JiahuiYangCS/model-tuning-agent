@@ -1,3 +1,9 @@
+"""
+Training and configuration module / 训练和配置模块
+
+核心训练函数和默认配置
+"""
+
 import os
 import random
 from datetime import datetime
@@ -17,83 +23,21 @@ from sentence_transformers.training_args import (
 )
 from sentence_transformers.trainer import SentenceTransformerTrainer
 
+# Import from centralized config
+from config import DEFAULT_CONFIG, TUNABLE_KEYS as GLOBAL_TUNABLE_KEYS
 
-# =============== 配置 ===============
+
+# 导出 TUNABLE_KEYS 以保持向后兼容性
+TUNABLE_KEYS = GLOBAL_TUNABLE_KEYS
+
 
 def make_default_config() -> Dict[str, Any]:
-    """返回一份可调参配置的默认值（缩小版，方便测试）。"""
-    return {
-        # 开关
-        "ENABLE_TRIPLET_EVAL": False,
-        "ENABLE_QUORA_TEST":   False,  # 默认先关掉 Quora 测试减轻负担
-
-        # 模型 & 输出路径
-        "BASE_MODEL":        "sentence-transformers/all-MiniLM-L6-v2",
-        "OUTPUT_DIR_ROOT":   "models",
-        "RUN_NAME_PREFIX":   "stv3_agent_demo_",
-        "RUN_NAME":          "agent_autotune_demo",
-
-        # 数据子集（进一步调小）
-        "STSB_TRAIN_SPLIT": "train[:200]",
-        "STSB_DEV_SPLIT":   "validation[:100]",
-
-        # 训练超参（缩小版）
-        "NUM_TRAIN_EPOCHS":   1,
-        "TRAIN_BATCH_SIZE":   8,
-        "EVAL_BATCH_SIZE":    8,
-        "GRAD_ACC_STEPS":     1,
-        "LEARNING_RATE":      2e-5,
-        "WARMUP_RATIO":       0.1,
-
-        "EVAL_STRATEGY":      "steps",
-        "EVAL_STEPS":         50,
-        "LOGGING_STEPS":      10,
-        "SAVE_STRATEGY":      "epoch",
-        "SAVE_STEPS":         50,
-        "SAVE_TOTAL_LIMIT":   1,
-        "LOGGING_FIRST_STEP": True,
-
-        # Quora 相关（默认用不到）
-        "QUORA_SPLIT":       "train[:100]",
-        "QUORA_MAX_PRINT":   2,
-        "QUORA_FIGSIZE":     [6, 4],
-        "QUORA_HIST_BINS":   10,
-    }
-
-
-# 允许 GPT 修改的键
-TUNABLE_KEYS = [
-    "BASE_MODEL",
-    "ENABLE_TRIPLET_EVAL",
-    "ENABLE_QUORA_TEST",
-
-    "STSB_TRAIN_SPLIT",
-    "STSB_DEV_SPLIT",
-
-    "NUM_TRAIN_EPOCHS",
-    "TRAIN_BATCH_SIZE",
-    "EVAL_BATCH_SIZE",
-    "GRAD_ACC_STEPS",
-    "LEARNING_RATE",
-    "WARMUP_RATIO",
-
-    "EVAL_STRATEGY",
-    "EVAL_STEPS",
-    "LOGGING_STEPS",
-    "SAVE_STRATEGY",
-    "SAVE_STEPS",
-    "SAVE_TOTAL_LIMIT",
-    "LOGGING_FIRST_STEP",
-
-    "QUORA_SPLIT",
-    "QUORA_MAX_PRINT",
-    "QUORA_FIGSIZE",
-    "QUORA_HIST_BINS",
-]
+    """从 config.py 返回默认配置"""
+    return DEFAULT_CONFIG.copy()
 
 
 def export_config_for_agent(config: Dict[str, Any]) -> Dict[str, Any]:
-    """从当前 config 中抽取一份给 GPT 看的视图。"""
+    """从当前 config 中抽取一份给 GPT 看的视图（只包含 TUNABLE_KEYS 中的键）"""
     cfg = {}
     for k in TUNABLE_KEYS:
         if k in config:
@@ -102,6 +46,7 @@ def export_config_for_agent(config: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def set_global_seed(seed: int = 42):
+    """设置全局随机种子（Python、NumPy、PyTorch、CUDA）"""
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
@@ -110,7 +55,16 @@ def set_global_seed(seed: int = 42):
 
 
 def train_one_round(config: Dict[str, Any], round_id: int = 1) -> Tuple[Dict[str, Any], Dict[str, Any]]:
-    """按当前 config 训练一轮，返回 (training_summary, metrics)。"""
+    """
+    按当前 config 训练一轮，返回 (training_summary, metrics)
+    
+    参数 / Args:
+        config: 包含所有超参的字典
+        round_id: 轮次编号
+    
+    返回 / Returns:
+        (summary, metrics): 训练摘要和评估指标
+    """
 
     set_global_seed(42)
     device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -123,16 +77,16 @@ def train_one_round(config: Dict[str, Any], round_id: int = 1) -> Tuple[Dict[str
     os.makedirs(output_dir, exist_ok=True)
 
     print(f"\n====== 第 {round_id} 轮训练开始 ======")
-    print("设备:", device)
-    print("输出目录:", output_dir)
+    print("设备 / Device:", device)
+    print("输出目录 / Output dir:", output_dir)
 
-    # 数据
+    # 加载数据集 / Load dataset
     stsb_train = load_dataset("sentence-transformers/stsb", split=config["STSB_TRAIN_SPLIT"])
     stsb_dev   = load_dataset("sentence-transformers/stsb", split=config["STSB_DEV_SPLIT"])
     print("STSb train size:", len(stsb_train))
     print("STSb dev size:", len(stsb_dev))
 
-    # 模型 & loss & evaluator
+    # 初始化模型、损失函数、评估器 / Initialize model, loss, evaluator
     model = SentenceTransformer(config["BASE_MODEL"], device=device)
     loss = CoSENTLoss(model)
 
@@ -143,7 +97,7 @@ def train_one_round(config: Dict[str, Any], round_id: int = 1) -> Tuple[Dict[str
         main_similarity = SimilarityFunction.COSINE,
     )
 
-    # 训练参数
+    # 训练参数 / Training arguments
     args = SentenceTransformerTrainingArguments(
         output_dir=output_dir,
         num_train_epochs=config["NUM_TRAIN_EPOCHS"],
@@ -170,6 +124,7 @@ def train_one_round(config: Dict[str, Any], round_id: int = 1) -> Tuple[Dict[str
 
     print(args)
 
+    # 创建训练器并训练 / Create trainer and train
     trainer = SentenceTransformerTrainer(
         model=model,
         args=args,
@@ -182,7 +137,7 @@ def train_one_round(config: Dict[str, Any], round_id: int = 1) -> Tuple[Dict[str
     train_result = trainer.train()
     trainer.save_model(output_dir)
 
-    # 主评估分数（兼容 float/dict）
+    # 获取主评估分数 / Get main evaluation score
     main_score_raw = stsb_evaluator(model)
     if isinstance(main_score_raw, dict):
         if "cosine" in main_score_raw:
@@ -192,7 +147,7 @@ def train_one_round(config: Dict[str, Any], round_id: int = 1) -> Tuple[Dict[str
     else:
         main_score = float(main_score_raw)
 
-    print(f"本轮主评估分数（STSb evaluator 返回值）: {main_score:.4f}")
+    print(f"本轮主评估分数（STSb evaluator 返回值）/ Main score: {main_score:.4f}")
 
     summary = {
         "round_id": round_id,
@@ -201,7 +156,7 @@ def train_one_round(config: Dict[str, Any], round_id: int = 1) -> Tuple[Dict[str
         "base_model": config["BASE_MODEL"],
         "stsb_train_size": len(stsb_train),
         "stsb_dev_size": len(stsb_dev),
-        "main_score": main_score,   # 存 float，方便后续使用
+        "main_score": main_score,
         "metrics": {},
     }
 
@@ -221,12 +176,15 @@ import matplotlib.pyplot as plt
 
 
 def run_quora_test_if_enabled(config: Dict[str, Any], model: SentenceTransformer):
-    """仅在 ENABLE_QUORA_TEST=True 时运行。"""
+    """
+    仅在 ENABLE_QUORA_TEST=True 时运行 Quora 重复问题检测测试
+    Run Quora duplicate question test only if ENABLE_QUORA_TEST=True
+    """
     if not config.get("ENABLE_QUORA_TEST", False):
-        print("跳过 Quora 测试（ENABLE_QUORA_TEST=False）")
+        print("跳过 Quora 测试 / Skip Quora test（ENABLE_QUORA_TEST=False）")
         return
 
-    print(f"加载 Quora Duplicate Questions 数据集（{config['QUORA_SPLIT']}）...")
+    print(f"加载 Quora Duplicate Questions 数据集 / Load Quora dataset（{config['QUORA_SPLIT']}）...")
     quora = load_dataset("quora", split=config["QUORA_SPLIT"], trust_remote_code=True)
 
     for i, row in enumerate(quora):
@@ -246,8 +204,8 @@ def run_quora_test_if_enabled(config: Dict[str, Any], model: SentenceTransformer
     df = pd.DataFrame(pairs)
     avg_dup = df[df["Label"] == 1]["CosineSim"].mean()
     avg_non = df[df["Label"] == 0]["CosineSim"].mean()
-    print(f"\n平均相似度（重复问对）：{avg_dup:.3f}")
-    print(f"平均相似度（非重复问对）：{avg_non:.3f}")
+    print(f"\n平均相似度（重复问对）/ Avg similarity (duplicate): {avg_dup:.3f}")
+    print(f"平均相似度（非重复问对）/ Avg similarity (non-dup): {avg_non:.3f}")
 
     figsize = config["QUORA_FIGSIZE"]
     if isinstance(figsize, list):
