@@ -119,6 +119,8 @@ class AGENT_SETTINGS:
     # GPT 模型选择
     GPT_MODEL = "gpt-3.5-turbo"         # 使用哪个 GPT 模型（gpt-3.5-turbo / gpt-4）
                                         # 💡 gpt-3.5-turbo 更便宜，gpt-4 更聪明
+    # LLM 来源: 'openai' 或 'openrouter'
+    LLM_SOURCE = "openai"
 
     # 是否进行交互式提示
     INTERACTIVE_MODE = True             # True 时会询问用户是否继续，False 时自动运行
@@ -153,6 +155,24 @@ class MODEL_SETTINGS:
 
     # 设备
     USE_GPU = True                      # 自动检测 GPU 并使用
+
+
+# ============================================================================
+# 🌐 外部模型源 / EXTERNAL MODEL SOURCES
+# ============================================================================
+# 支持从多个模型源调用模型，例如 'openai'（默认）和 'openrouter'
+# To add a new provider, add it to AVAILABLE_MODEL_SOURCES and
+# provide relevant keys as environment variables (see OPENROUTER below).
+MODEL_SOURCES = {
+   "default": "openai",
+   "available": ["openai", "openrouter"],
+}
+
+# OpenRouter specific settings
+OPENROUTER = {
+   "API_BASE": "https://openrouter.ai/api/v1",
+   "API_KEY_ENV": "OPENROUTER_API_KEY",
+}
 
 
 # ============================================================================

@@ -28,6 +28,7 @@ from agents.gpt_agent import (
     ask_gpt_for_new_config,
     ask_gpt_for_overall_summary,
 )
+from utils.llm import list_openrouter_free_models
 from utils.report_generator import generate_run_report
 
 
@@ -71,6 +72,38 @@ def run_agent() -> None:
     print("默认初始超参（可调部分）:")
     print(json.dumps(export_config_for_agent(current_config), ensure_ascii=False, indent=2))
     print()
+
+    # ========== LLM 模型选择（交互式） ==========
+    def select_llm_model():
+        default = AGENT_SETTINGS.GPT_MODEL
+        options = [{"source": "openai", "model": default, "label": f"OpenAI GPT ({default})"}]
+        try:
+            ors = list_openrouter_free_models(3)
+            for m in ors:
+                options.append({"source": "openrouter", "model": m.get("id"), "label": f"{m.get('id')} ({m.get('provider')})"})
+        except Exception:
+            # 如果无法获取 OpenRouter 模型，继续只提供 OpenAI 选项
+            pass
+
+        print("请选择要用于与 Agent 对话的模型：")
+        for idx, opt in enumerate(options, start=1):
+            print(f"  {idx}. {opt['label']}")
+        sel = input("请输入编号 (默认 1): ").strip()
+        try:
+            if not sel:
+                choice = options[0]
+            else:
+                idx = int(sel)
+                choice = options[idx - 1]
+        except Exception:
+            print("无效输入，使用默认。")
+            choice = options[0]
+
+        AGENT_SETTINGS.GPT_MODEL = choice['model']
+        AGENT_SETTINGS.LLM_SOURCE = choice['source']
+        print(f"已选择: {choice['label']} (source={AGENT_SETTINGS.LLM_SOURCE})")
+
+    select_llm_model()
 
     # 全局最佳统计 / Global best tracking
     best_score: float = -1e9
@@ -263,6 +296,7 @@ def run_agent() -> None:
 
     # 生成报告 / Generate report
     try:
+        model_label = f"{AGENT_SETTINGS.LLM_SOURCE}:{AGENT_SETTINGS.GPT_MODEL}"
         report_path = generate_run_report(
             history_for_agent,
             best_round,
@@ -270,6 +304,7 @@ def run_agent() -> None:
             best_config,
             valid_priority_keys,
             base_cfg,
+            model_label=model_label,
         )
     except Exception as e:
         print(f"\n生成报告失败（不影响结果）: {repr(e)}")

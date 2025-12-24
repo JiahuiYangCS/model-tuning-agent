@@ -10,6 +10,7 @@ import json
 from utils.openai_client import client
 from core.training import TUNABLE_KEYS
 from config import AGENT_SETTINGS
+from utils.llm import chat
 
 
 def build_agent_input(
@@ -101,7 +102,9 @@ def ask_gpt_for_initial_plan(
     }
     user_input = json.dumps(payload, ensure_ascii=False, indent=2)
 
-    completion = client.chat.completions.create(
+    source = getattr(AGENT_SETTINGS, "LLM_SOURCE", "openai")
+    content = chat(
+        source=source,
         model=model,
         messages=[
             {"role": "system", "content": system_prompt},
@@ -109,7 +112,6 @@ def ask_gpt_for_initial_plan(
         ],
         temperature=0.3,
     )
-    content = completion.choices[0].message.content
     try:
         data = json.loads(content)
     except json.JSONDecodeError as e:
@@ -187,7 +189,9 @@ def ask_gpt_for_new_config(
         primary_key=primary_key,
     )
 
-    completion = client.chat.completions.create(
+    source = getattr(AGENT_SETTINGS, "LLM_SOURCE", "openai")
+    content = chat(
+        source=source,
         model=model,
         messages=[
             {"role": "system", "content": system_prompt},
@@ -195,8 +199,6 @@ def ask_gpt_for_new_config(
         ],
         temperature=0.2,
     )
-
-    content = completion.choices[0].message.content
     try:
         data = json.loads(content)
     except json.JSONDecodeError as e:
@@ -259,7 +261,9 @@ def ask_gpt_for_overall_summary(
 
     user_input = json.dumps(payload, ensure_ascii=False, indent=2)
 
-    completion = client.chat.completions.create(
+    source = getattr(AGENT_SETTINGS, "LLM_SOURCE", "openai")
+    content = chat(
+        source=source,
         model=model,
         messages=[
             {"role": "system", "content": system_prompt},
@@ -267,5 +271,4 @@ def ask_gpt_for_overall_summary(
         ],
         temperature=0.3,
     )
-    content = completion.choices[0].message.content.strip()
-    return content
+    return content.strip()

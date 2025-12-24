@@ -17,6 +17,7 @@ def generate_run_report(
     best_config: Optional[Dict[str, Any]],
     priority_keys: List[str],
     base_cfg: Dict[str, Any],
+    model_label: Optional[str] = None,
 ) -> str:
     """
     生成报告：先显示最终结果摘要，后显示每轮详细记录
@@ -39,10 +40,15 @@ def generate_run_report(
     report_path = os.path.join(report_dir, filename)
 
     lines: List[str] = []
-    lines.append(f"# Agent 运行报告 / Agent Run Report ({ts})\n")
+    title = f"Agent 运行报告 / Agent Run Report ({ts})"
+    if model_label:
+        title = f"{title} — Model: {model_label}"
+    lines.append(f"# {title}\n")
     
     # ===== 最终结果摘要（放在最上方）=====
     lines.append("## 最终结果摘要 / Final Results Summary\n")
+    if model_label:
+        lines.append(f"**模型 / Model Used:** {model_label}\n")
     lines.append(f"**最优轮次 / Best Round:** {best_round}\n")
     lines.append(f"**最优分数 / Best Score:** {best_score:.4f}\n")
     lines.append(f"**调整的参数 / Tuned Parameters:** {', '.join(priority_keys)}\n")
