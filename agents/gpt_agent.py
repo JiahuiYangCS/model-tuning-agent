@@ -6,11 +6,62 @@ GPT Agent module / GPT 代理模块
 
 from typing import Dict, Any, List, Optional
 import json
+import re
 
 from utils.openai_client import client
 from core.training import TUNABLE_KEYS
 from config import AGENT_SETTINGS
 from utils.llm import chat
+
+
+def parse_llm_json_response(content: str) -> Dict[str, Any]:
+    """
+    从 LLM 的返回内容中解析 JSON，支持多种情况：
+    1. 纯 JSON 字符串
+    2. Markdown 代码块包裹的 JSON
+    3. 文本中夹杂的 JSON
+    
+    参数 / Args:
+        content: LLM 返回的原始文本
+    
+    返回 / Returns:
+        解析后的字典
+    
+    抛出 / Raises:
+        ValueError: 无法解析出合法 JSON
+    """
+    content = content.strip()
+    
+    # 尝试 1: 直接解析
+    try:
+        return json.loads(content)
+    except json.JSONDecodeError:
+        pass
+    
+    # 尝试 2: 移除 Markdown 代码块标记 ```json ... ``` 或 ``` ... ```
+    markdown_pattern = r'```(?:json)?\s*\n(.*?)\n```'
+    match = re.search(markdown_pattern, content, re.DOTALL)
+    if match:
+        json_text = match.group(1).strip()
+        try:
+            return json.loads(json_text)
+        except json.JSONDecodeError:
+            pass
+    
+    # 尝试 3: 从文本中提取第一个看起来像 JSON 对象的部分
+    json_object_pattern = r'\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}'
+    matches = re.finditer(json_object_pattern, content, re.DOTALL)
+    for match in matches:
+        try:
+            return json.loads(match.group(0))
+        except json.JSONDecodeError:
+            continue
+    
+    # 全部尝试失败
+    raise ValueError(
+        f"无法从 LLM 返回内容中解析出合法 JSON。\n"
+        f"原始内容（前500字符）：\n{content[:500]}"
+    )
 
 
 def build_agent_input(
@@ -112,10 +163,8 @@ def ask_gpt_for_initial_plan(
         ],
         temperature=0.3,
     )
-    try:
-        data = json.loads(content)
-    except json.JSONDecodeError as e:
-        raise ValueError(f"LLM 返回的内容不是合法 JSON，content=\n{content}") from e
+    
+    data = parse_llm_json_response(content)
 
     if "base_config" not in data or "priority_keys" not in data:
         raise ValueError(f"LLM 返回 JSON 中缺少 base_config/priority_keys 字段：{data}")
@@ -199,10 +248,8 @@ def ask_gpt_for_new_config(
         ],
         temperature=0.2,
     )
-    try:
-        data = json.loads(content)
-    except json.JSONDecodeError as e:
-        raise ValueError(f"LLM 返回的内容不是合法 JSON，content=\n{content}") from e
+    
+    data = parse_llm_json_response(content)
 
     if "comment" not in data or "new_config" not in data:
         raise ValueError(f"LLM 返回 JSON 中缺少 comment/new_config 字段：{data}")

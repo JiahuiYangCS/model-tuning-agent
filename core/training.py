@@ -31,6 +31,22 @@ from config import DEFAULT_CONFIG, TUNABLE_KEYS as GLOBAL_TUNABLE_KEYS
 TUNABLE_KEYS = GLOBAL_TUNABLE_KEYS
 
 
+def get_gpu_info() -> str:
+    """
+    自动检测GPU信息，如果不可用返回"CPU"
+    
+    返回 / Returns:
+        GPU 名称或 "CPU"
+    """
+    if torch.cuda.is_available():
+        try:
+            return torch.cuda.get_device_name(0)
+        except Exception:
+            return "CUDA GPU (Unknown Model)"
+    else:
+        return "CPU"
+
+
 def make_default_config() -> Dict[str, Any]:
     """从 config.py 返回默认配置"""
     return DEFAULT_CONFIG.copy()
@@ -80,22 +96,59 @@ def train_one_round(config: Dict[str, Any], round_id: int = 1) -> Tuple[Dict[str
     print("设备 / Device:", device)
     print("输出目录 / Output dir:", output_dir)
 
-    # 加载数据集 / Load dataset
-    stsb_train = load_dataset("sentence-transformers/stsb", split=config["STSB_TRAIN_SPLIT"])
-    stsb_dev   = load_dataset("sentence-transformers/stsb", split=config["STSB_DEV_SPLIT"])
-    print("STSb train size:", len(stsb_train))
-    print("STSb dev size:", len(stsb_dev))
+    # 加载数据集 / Load dataset - 支持多种数据集
+    dataset_name = config.get("DATASET_NAME", "stsb")
+    
+    if dataset_name == "stsb":
+        # STSb 数据集
+        train_data = load_dataset("sentence-transformers/stsb", split=config["STSB_TRAIN_SPLIT"])
+        dev_data = load_dataset("sentence-transformers/stsb", split=config["STSB_DEV_SPLIT"])
+        print(f"数据集 / Dataset: STSb")
+        print(f"训练样本 / Train size: {len(train_data)}")
+        print(f"验证样本 / Dev size: {len(dev_data)}")
+        
+        # 初始化评估器
+        evaluator = EmbeddingSimilarityEvaluator(
+            sentences1 = dev_data["sentence1"],
+            sentences2 = dev_data["sentence2"],
+            scores     = dev_data["score"],
+            main_similarity = SimilarityFunction.COSINE,
+        )
+        
+    elif dataset_name == "allnli":
+        # AllNLI 数据集
+        train_data = load_dataset("sentence-transformers/all-nli", split=config.get("ALLNLI_TRAIN_SPLIT", "train[:50000]"))
+        dev_data = load_dataset("sentence-transformers/all-nli", split=config.get("ALLNLI_DEV_SPLIT", "validation"))
+        print(f"数据集 / Dataset: AllNLI (SNLI + MultiNLI)")
+        print(f"训练样本 / Train size: {len(train_data)}")
+        print(f"验证样本 / Dev size: {len(dev_data)}")
+        
+        # AllNLI 使用不同的评估器（NLI任务）
+        evaluator = EmbeddingSimilarityEvaluator(
+            sentences1 = dev_data["sentence1"],
+            sentences2 = dev_data["sentence2"],
+            scores     = [1.0 if label == 0 else 0.0 for label in dev_data["label"]],  # entailment=1, 其他=0
+            main_similarity = SimilarityFunction.COSINE,
+        )
+        
+    else:
+        # 默认回退到STSb
+        print(f"⚠️ 未知数据集: {dataset_name}，使用默认STSb")
+        train_data = load_dataset("sentence-transformers/stsb", split=config["STSB_TRAIN_SPLIT"])
+        dev_data = load_dataset("sentence-transformers/stsb", split=config["STSB_DEV_SPLIT"])
+        print(f"训练样本 / Train size: {len(train_data)}")
+        print(f"验证样本 / Dev size: {len(dev_data)}")
+        
+        evaluator = EmbeddingSimilarityEvaluator(
+            sentences1 = dev_data["sentence1"],
+            sentences2 = dev_data["sentence2"],
+            scores     = dev_data["score"],
+            main_similarity = SimilarityFunction.COSINE,
+        )
 
-    # 初始化模型、损失函数、评估器 / Initialize model, loss, evaluator
+    # 初始化模型、损失函数 / Initialize model, loss
     model = SentenceTransformer(config["BASE_MODEL"], device=device)
     loss = CoSENTLoss(model)
-
-    stsb_evaluator = EmbeddingSimilarityEvaluator(
-        sentences1 = stsb_dev["sentence1"],
-        sentences2 = stsb_dev["sentence2"],
-        scores     = stsb_dev["score"],
-        main_similarity = SimilarityFunction.COSINE,
-    )
 
     # 训练参数 / Training arguments
     args = SentenceTransformerTrainingArguments(
@@ -128,17 +181,17 @@ def train_one_round(config: Dict[str, Any], round_id: int = 1) -> Tuple[Dict[str
     trainer = SentenceTransformerTrainer(
         model=model,
         args=args,
-        train_dataset=stsb_train,
-        eval_dataset=stsb_dev,
+        train_dataset=train_data,
+        eval_dataset=dev_data,
         loss=loss,
-        evaluator=stsb_evaluator,
+        evaluator=evaluator,
     )
 
     train_result = trainer.train()
     trainer.save_model(output_dir)
 
     # 获取主评估分数 / Get main evaluation score
-    main_score_raw = stsb_evaluator(model)
+    main_score_raw = evaluator(model)
     if isinstance(main_score_raw, dict):
         if "cosine" in main_score_raw:
             main_score = float(main_score_raw["cosine"])
@@ -154,8 +207,9 @@ def train_one_round(config: Dict[str, Any], round_id: int = 1) -> Tuple[Dict[str
         "output_dir": output_dir,
         "device": device,
         "base_model": config["BASE_MODEL"],
-        "stsb_train_size": len(stsb_train),
-        "stsb_dev_size": len(stsb_dev),
+        "dataset": dataset_name,
+        "train_size": len(train_data),
+        "dev_size": len(dev_data),
         "main_score": main_score,
         "metrics": {},
     }
@@ -166,6 +220,11 @@ def train_one_round(config: Dict[str, Any], round_id: int = 1) -> Tuple[Dict[str
         summary["metrics"] = train_result
     else:
         summary["metrics"] = {}
+    
+    # 确保metrics中包含主评估分数（用于报告生成器）
+    # Ensure metrics contains the main evaluation score (for report generator)
+    if "eval_stsb_dev_spearman_cosine" not in summary["metrics"]:
+        summary["metrics"]["eval_stsb_dev_spearman_cosine"] = main_score
 
     return summary, summary["metrics"]
 

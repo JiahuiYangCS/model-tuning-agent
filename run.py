@@ -81,9 +81,12 @@ def run_agent() -> None:
             ors = list_openrouter_free_models(3)
             for m in ors:
                 options.append({"source": "openrouter", "model": m.get("id"), "label": f"{m.get('id')} ({m.get('provider')})"})
-        except Exception:
-            # 如果无法获取 OpenRouter 模型，继续只提供 OpenAI 选项
-            pass
+        except ConnectionError as e:
+            print(f"⚠️  无法连接 OpenRouter: {e}")
+        except ValueError as e:
+            print(f"⚠️  解析 OpenRouter 模型列表失败: {e}")
+        except Exception as e:
+            print(f"⚠️  获取 OpenRouter 模型失败: {repr(e)}")
 
         print("请选择要用于与 Agent 对话的模型：")
         for idx, opt in enumerate(options, start=1):
@@ -95,10 +98,10 @@ def run_agent() -> None:
             else:
                 idx = int(sel)
                 choice = options[idx - 1]
-        except Exception:
-            print("无效输入，使用默认。")
-            choice = options[0]
-
+        except (ValueError, IndexError):
+                print("无效输入，使用默认。")
+                choice = options[0]
+        
         AGENT_SETTINGS.GPT_MODEL = choice['model']
         AGENT_SETTINGS.LLM_SOURCE = choice['source']
         print(f"已选择: {choice['label']} (source={AGENT_SETTINGS.LLM_SOURCE})")
@@ -106,7 +109,7 @@ def run_agent() -> None:
     select_llm_model()
 
     # 全局最佳统计 / Global best tracking
-    best_score: float = -1e9
+    best_score: Optional[float] = None
     best_round: Optional[int] = None
     best_config: Optional[Dict[str, Any]] = None
     best_output_dir: Optional[str] = None
@@ -151,6 +154,14 @@ def run_agent() -> None:
         print("\n✅ 应用 base_config 后的初始超参 / Initial config after applying base_config:")
         print(json.dumps(export_config_for_agent(current_config), ensure_ascii=False, indent=2))
 
+    except ValueError as e:
+        print(f"\n⚠️  初始计划调用失败: JSON 解析错误")
+        print(f"   错误 / Error: {repr(e)}")
+        valid_priority_keys = TUNABLE_KEYS[:AGENT_SETTINGS.MAX_PRIORITY_PARAMS]
+    except ConnectionError as e:
+        print(f"\n⚠️  初始计划调用失败: 网络连接问题")
+        print(f"   错误 / Error: {repr(e)}")
+        valid_priority_keys = TUNABLE_KEYS[:AGENT_SETTINGS.MAX_PRIORITY_PARAMS]
     except Exception as e:
         print(f"\n⚠️  初始计划调用失败，使用默认策略 / Initial plan failed, using default strategy")
         print(f"   错误 / Error: {repr(e)}")
@@ -169,7 +180,7 @@ def run_agent() -> None:
         print(f"参数 {param_index + 1}/{MAX_PARAMS}: {key}")
         print("=" * 70)
 
-        param_best_score: float = -1e9
+        param_best_score: Optional[float] = None
         param_best_round: Optional[int] = None
         param_best_value = current_config.get(key, None)
 
@@ -203,13 +214,13 @@ def run_agent() -> None:
 
                 # 更新该参数内部的最佳记录 / Update parameter's best score
                 cur_value = current_config.get(key, None)
-                if main_score > param_best_score:
+                if param_best_score is None or main_score > param_best_score:
                     param_best_score = main_score
                     param_best_round = global_round_id
                     param_best_value = cur_value
 
                 # 更新全局最佳记录 / Update global best score
-                if main_score > best_score:
+                if best_score is None or main_score > best_score:
                     best_score = main_score
                     best_round = global_round_id
                     best_config = export_config_for_agent(current_config)
@@ -225,6 +236,14 @@ def run_agent() -> None:
                         history=history_for_agent,
                         primary_key=key,
                     )
+                except ValueError as ve:
+                    print(f"\nGPT JSON 解析失败，本参数调参结束")
+                    print(f"   错误: {repr(ve)}")
+                    break
+                except ConnectionError as ce:
+                    print(f"\nGPT 连接失败，本参数调参结束")
+                    print(f"   错误: {repr(ce)}")
+                    break
                 except Exception as e:
                     print(f"\nGPT 调用失败，本参数调参结束")
                     print(f"   错误: {repr(e)}")
@@ -244,11 +263,23 @@ def run_agent() -> None:
                     print(f"\n保持当前值 / {key}")
                     
             except RoundTimeoutException as te:
-                print(f"\n警告: {te}")
+                print(f"\n⚠️  警告: {te}")
                 print(f"跳过轮次 #{global_round_id}，继续下一轮或下一参数")
                 continue
+            except RuntimeError as re:
+                print(f"\n⚠️  运行时错误: {repr(re)}")
+                print(f"自动跳过此轮，继续下一轮")
+                continue
+            except ValueError as ve:
+                print(f"\n⚠️  配置值错误: {repr(ve)}")
+                print(f"自动跳过此轮，继续下一轮")
+                continue
             except Exception as e:
-                print(f"\n轮次发生错误: {repr(e)}")
+                print(f"\n⚠️  轮次发生未知错误: {repr(e)}")
+                print(f"自动跳过此轮，继续下一轮")
+                import traceback
+                traceback.print_exc()
+                continue
                 print(f"自动跳过此轮，继续下一轮")
                 continue
 
@@ -288,6 +319,15 @@ def run_agent() -> None:
             best_overall_dir = os.path.join(parent_dir, "best_overall_model")
             print(f"\n复制最佳模型...")
             print(f"   从: {best_output_dir}")
+            print(f"   至: {best_overall_dir}")
+            shutil.copytree(best_output_dir, best_overall_dir, dirs_exist_ok=True)
+            print("✅ 模型复制完成")
+        except FileNotFoundError as e:
+            print(f"\n⚠️  复制最佳模型失败: 文件不存在 - {repr(e)}")
+        except PermissionError as e:
+            print(f"\n⚠️  复制最佳模型失败: 权限不足 - {repr(e)}")
+        except Exception as e:
+            print(f"\n⚠️  复制最佳模型失败（不影响结果）: {repr(e)}")
             print(f"   至: {best_overall_dir}")
             shutil.copytree(best_output_dir, best_overall_dir, dirs_exist_ok=True)
             print("模型复制完成")

@@ -24,6 +24,7 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     # -------- 功能开关 / Feature Flags --------
     "ENABLE_TRIPLET_EVAL": False,      # 是否启用 Triplet 评估
     "ENABLE_QUORA_TEST": False,         # 是否在 Quora 数据上测试（关闭加快速度）
+    "QUICK_TEST_MODE": True,            # 快速测试模式（使用小数据集）
 
     # -------- 模型 & 数据路径 / Model & Data Paths --------
     "BASE_MODEL": "sentence-transformers/all-MiniLM-L6-v2",  # 底层模型选择
@@ -31,17 +32,24 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     "RUN_NAME_PREFIX": "stv3_agent_demo_",  # 输出文件夹前缀
     "RUN_NAME": "agent_autotune_demo",  # 训练 run 名称
 
+    # -------- 数据集配置 / Dataset Configuration --------
+    # 💡 支持多种数据集: 'stsb', 'allnli', 'msmarco'
+    "DATASET_NAME": "stsb",  # 数据集选择
+    
     # -------- 数据子集 / Data Subset --------
-    # 💡 提示：改这些值可以快速测试（train[:200] 用 200 个样本）
-    # Tip: Change these for quick testing (e.g., train[:200] uses 200 samples)
-    "STSB_TRAIN_SPLIT": "train[:200]",  # STSb 训练集（默认只用前 200 个加快速度）
-    "STSB_DEV_SPLIT": "validation[:100]",  # STSb 验证集
+    # 💡 快速测试模式：使用小数据集快速验证流程
+    "STSB_TRAIN_SPLIT": "train[:100]",  # STSb 训练集（快速测试：100样本）
+    "STSB_DEV_SPLIT": "validation[:50]",  # STSb 验证集（快速测试：50样本）
+    
+    # AllNLI 数据集配置（可选）
+    "ALLNLI_TRAIN_SPLIT": "train[:50000]",  # AllNLI 训练集（推荐5万样本）
+    "ALLNLI_DEV_SPLIT": "validation",  # AllNLI 验证集
 
     # -------- 训练超参 / Training Hyperparameters --------
     # 💡 这些参数直接影响训练效果，可由 GPT Agent 自动调整
-    "NUM_TRAIN_EPOCHS": 1,              # 训练轮数（增加可能更优但更慢）
-    "TRAIN_BATCH_SIZE": 8,              # 训练批大小（显存允许可增加到 16/32）
-    "EVAL_BATCH_SIZE": 8,               # 评估批大小
+    "NUM_TRAIN_EPOCHS": 1,              # 训练轮数（快速测试：1轮）
+    "TRAIN_BATCH_SIZE": 8,              # 训练批大小（快速测试：8）
+    "EVAL_BATCH_SIZE": 8,               # 评估批大小（快速测试：8）
     "GRAD_ACC_STEPS": 1,                # 梯度累积步数（可用来模拟更大 batch）
     "LEARNING_RATE": 2e-5,              # 学习率（通常 1e-5 ~ 5e-4）
     "WARMUP_RATIO": 0.1,                # 预热比例
@@ -76,8 +84,11 @@ TUNABLE_KEYS: List[str] = [
     "ENABLE_QUORA_TEST",
 
     # 数据相关
+    "DATASET_NAME",
     "STSB_TRAIN_SPLIT",
     "STSB_DEV_SPLIT",
+    "ALLNLI_TRAIN_SPLIT",
+    "ALLNLI_DEV_SPLIT",
 
     # 训练超参（最常调的）
     "NUM_TRAIN_EPOCHS",

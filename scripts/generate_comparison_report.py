@@ -39,6 +39,18 @@ def extract_report_info(report_path: Path) -> Dict[str, Any]:
     if score_match:
         info["best_score"] = float(score_match.group(1))
     
+    # If best_score is 0, try to extract from detailed records
+    if info["best_score"] == 0.0:
+        main_score_match = re.search(r"\*\*分数 / Score:\*\* ([\d.]+)", content)
+        if main_score_match:
+            info["best_score"] = float(main_score_match.group(1))
+    
+    # If still 0, try to extract eval_spearman_cosine from metrics
+    if info["best_score"] == 0.0:
+        eval_spearman_match = re.search(r"['\"]eval_spearman_cosine['\"]:\s*([\d.]+)", content)
+        if eval_spearman_match:
+            info["best_score"] = float(eval_spearman_match.group(1))
+    
     # Extract training runtime from config section
     runtime_match = re.search(r"'train_runtime':\s*([\d.]+)", content)
     if runtime_match:
