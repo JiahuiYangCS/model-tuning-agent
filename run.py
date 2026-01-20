@@ -9,6 +9,17 @@ STSb Auto-Tune Agent 主入口脚本 / Main Entry Point
     python run.py
 """
 
+# 修复 Windows 控制台编码问题
+import sys
+import os
+if sys.platform == 'win32':
+    os.environ['PYTHONIOENCODING'] = 'utf-8'
+    try:
+        sys.stdout.reconfigure(encoding='utf-8')
+        sys.stderr.reconfigure(encoding='utf-8')
+    except AttributeError:
+        pass  # Python < 3.7
+
 import json
 import os
 import shutil

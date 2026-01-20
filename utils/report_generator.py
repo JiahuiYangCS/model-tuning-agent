@@ -6,8 +6,17 @@ Report Generator module / 报告生成模块
 
 import os
 import json
+import sys
 from datetime import datetime
 from typing import Dict, Any, List, Optional
+
+# 修复 Windows 控制台编码
+if sys.platform == 'win32':
+    try:
+        sys.stdout.reconfigure(encoding='utf-8')
+        sys.stderr.reconfigure(encoding='utf-8')
+    except AttributeError:
+        pass
 
 
 def extract_score(main_score: float, metrics: Optional[Dict[str, Any]] = None) -> float:

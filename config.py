@@ -24,7 +24,7 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     # -------- 功能开关 / Feature Flags --------
     "ENABLE_TRIPLET_EVAL": False,      # 是否启用 Triplet 评估
     "ENABLE_QUORA_TEST": False,         # 是否在 Quora 数据上测试（关闭加快速度）
-    "QUICK_TEST_MODE": True,            # 快速测试模式（使用小数据集）
+    "QUICK_TEST_MODE": False,           # GPU高负载测试模式 - 使用全量数据
 
     # -------- 模型 & 数据路径 / Model & Data Paths --------
     "BASE_MODEL": "sentence-transformers/all-MiniLM-L6-v2",  # 底层模型选择
@@ -37,9 +37,9 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     "DATASET_NAME": "stsb",  # 数据集选择
     
     # -------- 数据子集 / Data Subset --------
-    # 💡 快速测试模式：使用小数据集快速验证流程
-    "STSB_TRAIN_SPLIT": "train[:100]",  # STSb 训练集（快速测试：100样本）
-    "STSB_DEV_SPLIT": "validation[:50]",  # STSb 验证集（快速测试：50样本）
+    # 💡 GPU高负载测试模式：使用全量数据集达到80%+利用率
+    "STSB_TRAIN_SPLIT": "train",  # STSb 训练集（全量：5749样本）
+    "STSB_DEV_SPLIT": "validation",  # STSb 验证集（全量：1500样本）
     
     # AllNLI 数据集配置（可选）
     "ALLNLI_TRAIN_SPLIT": "train[:50000]",  # AllNLI 训练集（推荐5万样本）
@@ -47,9 +47,9 @@ DEFAULT_CONFIG: Dict[str, Any] = {
 
     # -------- 训练超参 / Training Hyperparameters --------
     # 💡 这些参数直接影响训练效果，可由 GPT Agent 自动调整
-    "NUM_TRAIN_EPOCHS": 1,              # 训练轮数（快速测试：1轮）
-    "TRAIN_BATCH_SIZE": 8,              # 训练批大小（快速测试：8）
-    "EVAL_BATCH_SIZE": 8,               # 评估批大小（快速测试：8）
+    "NUM_TRAIN_EPOCHS": 4,              # 训练轮数（GPU高负载测试：4轮）
+    "TRAIN_BATCH_SIZE": 32,             # 训练批大小（GPU高负载测试：32，充分利用显存）
+    "EVAL_BATCH_SIZE": 32,              # 评估批大小（GPU高负载测试：32）
     "GRAD_ACC_STEPS": 1,                # 梯度累积步数（可用来模拟更大 batch）
     "LEARNING_RATE": 2e-5,              # 学习率（通常 1e-5 ~ 5e-4）
     "WARMUP_RATIO": 0.1,                # 预热比例
