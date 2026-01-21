@@ -1,7 +1,6 @@
 # 环境变量和敏感信息
 .env
-.env.local
-.env.*.local
+!.env.example
 
 # Python 相关
 __pycache__/
@@ -10,17 +9,7 @@ __pycache__/
 *.so
 .Python
 build/
-develop-eggs/
 dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
 *.egg-info/
 .installed.cfg
 *.egg
@@ -37,17 +26,39 @@ env/
 *.swo
 *~
 .DS_Store
+Thumbs.db
+desktop.ini
 
-# 模型和数据文件
+# 训练生成的模型（保留特定文件）
+models/stv3_agent_demo_*/
+models/models/
+models/best_overall_model/*
+!models/best_overall_model/.gitkeep
 *.bin
 *.safetensors
-models/
-data/
 *.pth
 *.ckpt
 
-# 日志和临时文件
+# GPU监控日志和报告
+*.json
+!models/openrouter_free_models.json
+gpu_monitor_log*.json
+*_report.md
+!README.md
+!GPU_MONITOR_USAGE.md
+
+# 临时和测试文件
 *.log
+*.tmp
+*.bak
+*.txt
+
+# 文档reports目录（运行时生成）
+docs/reports/
+
+# Jupyter Notebook
+.ipynb_checkpoints/
+*.ipynb
 logs/
 tmp/
 temp/

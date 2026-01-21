@@ -24,7 +24,7 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     # -------- 功能开关 / Feature Flags --------
     "ENABLE_TRIPLET_EVAL": False,      # 是否启用 Triplet 评估
     "ENABLE_QUORA_TEST": False,         # 是否在 Quora 数据上测试（关闭加快速度）
-    "QUICK_TEST_MODE": False,           # GPU高负载测试模式 - 使用全量数据
+    "QUICK_TEST_MODE": True,            # 快速测试模式 - 使用少量数据
 
     # -------- 模型 & 数据路径 / Model & Data Paths --------
     "BASE_MODEL": "sentence-transformers/all-MiniLM-L6-v2",  # 底层模型选择
