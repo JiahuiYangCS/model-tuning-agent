@@ -1,19 +1,19 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-GPU监控守护进程 - 独立运行的GPU监控脚本
+GPU监控守护进程 - 后台静默记录GPU状态
 
 功能：
-1. 独立进程运行，与训练脚本并行
-2. 持续记录GPU状态到JSON文件
+1. 后台静默运行，与训练脚本并行
+2. 持续记录GPU状态到JSON文件（无实时显示）
 3. 训练结束后生成详细的历史分析报告
 
 使用方法：
-    # 启动监控（在独立终端）
+    # 启动后台监控（在独立终端）
     python gpu_monitor_daemon.py --output gpu_log.json --interval 1.0
     
     # 生成报告
-    python gpu_monitor_daemon.py --analyze gpu_log.json --output report.md
+    python gpu_monitor_daemon.py --analyze gpu_log.json --report report.md
 """
 
 import argparse
@@ -47,17 +47,20 @@ class GPUMonitorDaemon:
         self.start_time = None
         
     def start_monitoring(self):
-        """启动持续监控"""
+        """启动静默后台监控（无实时显示）"""
         print("=" * 70)
-        print("GPU监控守护进程已启动")
+        print("GPU后台监控已启动（静默模式）")
         print("=" * 70)
         print(f"输出文件: {self.output_file}")
         print(f"采样间隔: {self.interval}秒")
         print(f"GPU设备: {self.gpu_id}")
+        print("\n监控将在后台静默运行，不会实时显示数据")
         print("按 Ctrl+C 停止监控并保存数据")
         print("=" * 70)
         
         self.start_time = time.time()
+        sample_count = 0
+        last_print_time = time.time()
         
         try:
             while True:
@@ -68,15 +71,16 @@ class GPUMonitorDaemon:
                     metrics['relative_time'] = time.time() - self.start_time
                     metrics['datetime'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
                     self.data_log.append(metrics)
+                    sample_count += 1
                     
-                    # 实时显示
-                    print(f"\r[{metrics['datetime']}] "
-                          f"GPU: {metrics.get('gpu_utilization', 0):.1f}% | "
-                          f"显存: {metrics.get('memory_used_mb', 0):.0f}MB "
-                          f"({metrics.get('memory_utilization', 0):.1f}%) | "
-                          f"温度: {metrics.get('temperature', 0)}°C | "
-                          f"功耗: {metrics.get('power_draw', 0):.1f}W",
-                          end='', flush=True)
+                    # 每30秒显示一次简要状态（不影响实时性）
+                    current_time = time.time()
+                    if current_time - last_print_time >= 30:
+                        elapsed = current_time - self.start_time
+                        print(f"[监控中] 已运行 {elapsed:.0f}秒 | 采样点数: {sample_count} | "
+                              f"当前GPU: {metrics.get('gpu_utilization', 0):.1f}% | "
+                              f"显存: {metrics.get('memory_used_mb', 0):.0f}MB")
+                        last_print_time = current_time
                 
                 time.sleep(self.interval)
                 
@@ -86,6 +90,8 @@ class GPUMonitorDaemon:
             print(f"✓ 数据已保存到: {self.output_file}")
             print(f"✓ 共记录 {len(self.data_log)} 条数据")
             print(f"✓ 总监控时长: {time.time() - self.start_time:.1f}秒")
+            print(f"\n使用以下命令生成详细报告:")
+            print(f"python gpu_monitor_daemon.py --analyze {self.output_file} --report gpu_report.md")
             
     def save_data(self):
         """保存监控数据到JSON文件"""

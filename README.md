@@ -5,7 +5,7 @@
 ## ✨ 主要功能
 
 - **自动化模型微调**: 基于Sentence Transformers进行模型训练和评估
-- **独立GPU监控**: 实时监控GPU使用情况，训练结束后生成详细报告
+- **后台GPU监控**: 静默记录GPU使用情况，训练结束后生成详细报告
 - **智能优化建议**: 基于GPU状态提供batch size、混合精度等优化建议
 - **OpenRouter API集成**: 支持GPT等大模型API调用
 
@@ -42,7 +42,7 @@ python setup_openrouter_api_key.py
 
 ### 2. 运行训练（带GPU监控）
 
-**终端1 - 启动GPU监控**：
+**终端1 - 启动GPU后台监控**：
 ```bash
 python gpu_monitor_daemon.py --output training_log.json --interval 1.0
 ```
@@ -84,10 +84,11 @@ GPU_ID = 0
 
 ## 📊 GPU监控特性
 
-### 自动化监控
+### 后台静默监控
 - ✅ 独立进程，不影响训练性能
 - ✅ 低CPU开销（<0.5%）
-- ✅ 实时显示GPU状态
+- ✅ 静默记录，无实时显示干扰
+- ✅ 每30秒简要状态提示
 
 ### 智能分析
 - ✅ **自适应时间段**: 根据训练时长自动调整（总时长的10%，30-120秒）
