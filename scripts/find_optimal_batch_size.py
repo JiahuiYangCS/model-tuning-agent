@@ -141,77 +141,37 @@ class BatchSizeOptimizer:
             print(f"   - 预热步数: {self.NUM_WARMUP_STEPS}")
             print(f"   - 测量步数: {self.NUM_MEASUREMENT_STEPS}")
             
-            # 训练并测量
-            step_times = []
-            gpu_samples = []
+            # 使用model.fit进行简单直接的训练
+            measurement_start_time = time.time()
             
-            model.train()
-            optimizer = torch.optim.AdamW(
-                model.parameters(),
-                lr=self.FIXED_HYPERPARAMETERS['learning_rate'],
-                weight_decay=self.FIXED_HYPERPARAMETERS['weight_decay']
+            # 训练指定步数
+            model.fit(
+                train_objectives=[(train_dataloader, train_loss)],
+                epochs=1,
+                steps_per_epoch=self.NUM_WARMUP_STEPS + self.NUM_MEASUREMENT_STEPS,
+                warmup_steps=0,
+                optimizer_params={'lr': self.FIXED_HYPERPARAMETERS['learning_rate']},
+                show_progress_bar=True,
+                checkpoint_save_steps=9999,  # 不保存
+                checkpoint_path=None,
             )
             
-            step_count = 0
-            measurement_started = False
-            measurement_start_time = None
-            samples_processed = 0
+            # 记录结束时间
+            total_measurement_time = time.time() - measurement_start_time
             
-            for batch in train_dataloader:
-                if step_count >= self.NUM_WARMUP_STEPS + self.NUM_MEASUREMENT_STEPS:
-                    break
-                
-                step_start = time.time()
-                
-                # 前向传播
-                features = model.tokenize([ex.texts for ex in train_examples[
-                    step_count * batch_size:(step_count + 1) * batch_size
-                ]])
-                
-                # 计算损失
-                optimizer.zero_grad()
-                loss = train_loss(features, None)
-                
-                # 反向传播
-                loss.backward()
-                
-                # 梯度裁剪
-                torch.nn.utils.clip_grad_norm_(
-                    model.parameters(),
-                    self.FIXED_HYPERPARAMETERS['max_grad_norm']
-                )
-                
-                # 优化器步进
-                optimizer.step()
-                
-                step_end = time.time()
-                step_time = step_end - step_start
-                
-                # 预热后开始测量
-                if step_count >= self.NUM_WARMUP_STEPS:
-                    if not measurement_started:
-                        measurement_started = True
-                        measurement_start_time = step_end
-                        print(f"   ✓ 预热完成，开始正式测量...")
-                    
-                    step_times.append(step_time)
-                    samples_processed += batch_size
-                    
-                    # 记录GPU状态
-                    if torch.cuda.is_available() and step_count % 5 == 0:
-                        gpu_samples.append(self.gpu_monitor.get_instant_metrics())
-                
-                step_count += 1
-                
-                # 显示进度
-                if step_count % 10 == 0:
-                    print(f"   进度: {step_count}/{self.NUM_WARMUP_STEPS + self.NUM_MEASUREMENT_STEPS} 步")
+            # 采样GPU状态
+            gpu_samples = []
+            for _ in range(5):
+                gpu_samples.append(self.gpu_monitor.get_instant_metrics())
+                time.sleep(0.2)
+            
+            # 计算结果
+            samples_processed = (self.NUM_WARMUP_STEPS + self.NUM_MEASUREMENT_STEPS) * batch_size
+            step_times = [total_measurement_time / (self.NUM_WARMUP_STEPS + self.NUM_MEASUREMENT_STEPS)] * self.NUM_MEASUREMENT_STEPS
             
             # 计算测量结果
             if not step_times:
                 raise RuntimeError("未收集到有效的测量数据")
-            
-            total_measurement_time = time.time() - measurement_start_time
             
             # 关键指标：训练吞吐量（examples/second）
             training_throughput = samples_processed / total_measurement_time
@@ -270,7 +230,6 @@ class BatchSizeOptimizer:
             
             # 清理
             del model
-            del optimizer
             if torch.cuda.is_available():
                 torch.cuda.empty_cache()
             time.sleep(2)

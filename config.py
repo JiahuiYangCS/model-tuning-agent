@@ -27,7 +27,7 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     "QUICK_TEST_MODE": True,            # 快速测试模式 - 使用少量数据
 
     # -------- 模型 & 数据路径 / Model & Data Paths --------
-    "BASE_MODEL": "sentence-transformers/all-MiniLM-L6-v2",  # 底层模型选择
+    "BASE_MODEL": "sentence-transformers/all-mpnet-base-v2",  # 底层模型选择（109M参数，更好的性能）
     "OUTPUT_DIR_ROOT": "models",        # 训练输出根目录
     "RUN_NAME_PREFIX": "stv3_agent_demo_",  # 输出文件夹前缀
     "RUN_NAME": "agent_autotune_demo",  # 训练 run 名称
@@ -48,8 +48,8 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     # -------- 训练超参 / Training Hyperparameters --------
     # 💡 这些参数直接影响训练效果，可由 GPT Agent 自动调整
     "NUM_TRAIN_EPOCHS": 4,              # 训练轮数（GPU高负载测试：4轮）
-    "TRAIN_BATCH_SIZE": 32,             # 训练批大小（GPU高负载测试：32，充分利用显存）
-    "EVAL_BATCH_SIZE": 32,              # 评估批大小（GPU高负载测试：32）
+    "TRAIN_BATCH_SIZE": 96,             # 训练批大小（大模型推荐：96，基于batch size优化测试）
+    "EVAL_BATCH_SIZE": 96,              # 评估批大小（大模型推荐：96）
     "GRAD_ACC_STEPS": 1,                # 梯度累积步数（可用来模拟更大 batch）
     "LEARNING_RATE": 2e-5,              # 学习率（通常 1e-5 ~ 5e-4）
     "WARMUP_RATIO": 0.1,                # 预热比例
